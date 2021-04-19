@@ -1,0 +1,56 @@
+air quality
+carbon emissions
+CO2 emissions
+environmental impact
+fossil fuels
+pm2.5
+pollutants
+pollution
+water quality
+water sanitation
+weather
+aod
+aqi
+atmospheric aerosols
+atmospheric sciences
+black carbon
+climate change
+emission reduction
+energy consumption
+environmental and occupational health and safety
+environmental factors
+environmental health
+environmental impacts
+environmental policy
+environmental science
+environmental surveillance
+fine particulate matter
+humidity
+incineration
+medical waste
+meteorological factors
+meteorological parameters
+meteorology
+microplastics
+nitrogen dioxide
+nitrogen oxides
+no(2)
+no2
+nox
+particulate matter
+pm(10)
+pm(2.5)
+pm10
+remote sensing
+seasonality
+sewage
+sludge
+soil
+solid waste
+tropomi
+urban environment
+waste management
+wastewater treatment
+wildlife
+wind speed
+pollutant

@@ -1,0 +1,37 @@
+Scientometric
+bibliometrics
+disinformation
+fake news
+gis
+informatics
+information flow
+information science
+misinformation
+OMICs
+blockchain
+content analysis
+data mining
+data sharing
+fact-checking
+google trends
+health information
+infodemic
+infodemiology
+information systems
+information technology
+infoveillance
+natural language processing
+scientometrics
+sentiment analysis
+social media
+social network analysis
+spatial analysis
+text mining
+topic modeling
+twitter
+youtube
+big data tools
+big data analytics
+big data resources
+bioinformatics tools
+bioinformatics resources
