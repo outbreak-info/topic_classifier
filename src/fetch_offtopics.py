@@ -14,7 +14,8 @@ from src.common import get_ids_from_json
 
 def get_keypath(DATAPATH):
     KEYPATH = os.path.join(DATAPATH,'keywords/')
-    KEYFILES = os.listdir(KEYPATH)
+    keydirfiles = os.listdir(KEYPATH)
+    KEYFILES = [x for x in keydirfiles if '.txt' in x]
     return(KEYPATH,KEYFILES)
 
 

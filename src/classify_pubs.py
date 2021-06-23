@@ -16,10 +16,8 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 #### It uses pre-existing trained models, so if the models have been changed/updated, run the other script
 
 #### Pull ids from a json file
-from src.common import get_ids_from_json
-from src.common import clean_results
-from src.common import batch_fetch_meta
-from src.common import merge_texts
+from src.common import *
+from src.fetch_subtopics import load_clin_cats_data
 
 #### Get the size of the source (to make it easy to figure out when to stop scrolling)
 def fetch_src_size(source):
@@ -50,19 +48,6 @@ def get_source_ids(source):
         return(idlist)
     except:
         return(idlist)
-
-
-def get_pub_ids(sourceset):
-    pub_srcs = {"preprint":["bioRxiv","medRxiv"],"litcovid":["litcovid"],
-                "other":["Figshare","Zenodo","MRC Centre for Global Infectious Disease Analysis"],
-                "all":["Figshare","Zenodo","MRC Centre for Global Infectious Disease Analysis",
-                       "bioRxiv","medRxiv","litcovid"]}
-    sourcelist = pub_srcs[sourceset]
-    allids = []
-    for eachsource in sourcelist:
-        sourceids = get_source_ids(eachsource)
-        allids = list(set(allids).union(set(sourceids)))
-    return(allids)
 
 def load_vectorizer(MODELPATH,category):
     vectorizerfile = os.path.join(MODELPATH,"vectorizer_"+category+".pickle")
@@ -133,48 +118,76 @@ def filter_agreement(PREDICTPATH,topiclist,classifierlist,agreetype='perfect'):
     return(filtered_agreement)
 
 
-def merge_predictions(PREDICTPATH,topiclist,classifierlist,agreetype='perfect'):
+def merge_predictions(PREDICTPATH,topic_dict,classifierlist,agreetype='perfect'):
+    topiclist = list(set(topic_dict['broadtopics']).union(set(topic_dict['subtopics'])))
     agreement = filter_agreement(PREDICTPATH,topiclist,classifierlist,agreetype='perfect')
     agreement.drop_duplicates(inplace=True,keep="first")
     return(agreement)
     
-def classify_pubs(MODELPATH,PREDICTPATH,all_ids,topiclist,classifiers,newonly = True):
+    
+def classify_pubs(MODELPATH,PUBPREDICTPATH,all_ids,topic_dict,classifiers,newonly = True):
+    SUBMODELPATH = os.path.join(MODELPATH,'subtopics/')
+    topiclist = topic_dict['broadtopics']
+    subtopiclist = topic_dict['subtopics']
     alldf = batch_fetch_meta(all_ids)
     alldata = merge_texts(alldf)    
     classifierlist = classifiers.keys()
     if newonly == True:
-        predict_class(MODELPATH,PREDICTPATH,topiclist,classifierlist,alldata,newonly = True)
+        predict_class(MODELPATH,PUBPREDICTPATH,topiclist,classifierlist,alldata,True)
+        predict_class(SUBMODELPATH,PUBPREDICTPATH,subtopiclist,classifierlist,alldata,True)
     else:
-        predict_class(MODELPATH,PREDICTPATH,topiclist,classifierlist,alldata,newonly = False)
+        predict_class(MODELPATH,PUBPREDICTPATH,topiclist,classifierlist,alldata,False)
+        predict_class(SUBMODELPATH,PUBPREDICTPATH,subtopiclist,classifierlist,alldata,False)
 
-def check_for_new(RESULTSPATH,topicsdf):
+        
+def check_for_new(RESULTSPATH,topicsdf,sourceset):
     oldresults = read_csv(os.path.join(RESULTSPATH,'topicCats.tsv'),delimiter='\t',header=0,index_col=0)
     all_ids = oldresults['_id'].unique().tolist()
-    updated_pubslist = get_pub_ids(sourceset="other")
+    updated_pubslist = get_pub_ids(sourceset)
     new_pubs_only = [x for x in updated_pubslist if x not in all_ids]
     topics_ids = topicsdf['_id'].unique().tolist()
     new_topic_ids = [x for x in topics_ids if x not in oldresults]
     return(new_pubs_only,new_topic_ids)
 
-    
-def load_annotations(MODELPATH,PREDICTPATH,RESULTSPATH,topicsdf,classifiers,newonly = True):
-    topiclist = topicsdf['topicCategory'].unique().tolist()
+
+def classify_clins(DATAPATH,MODELPATH,PREDICTPATH,classifiers,topic_dict):
+    with open(os.path.join(DATAPATH,'clin_meta.pickle'),'rb') as tmpfile:
+        clin_meta = pickle.load(tmpfile)
+    ct_subtopics = load_clin_cats_data(os.path.join(DATAPATH,'subtopics/'))
+    topiclist = topic_dict['broadtopics']
+    subtopiclist = topic_dict['subtopics']
+    uncategorized_cts = clin_meta.loc[~clin_meta['_id'].isin(ct_subtopics['_id'].unique().tolist())]
+    has_sufficient_info = uncategorized_cts.loc[uncategorized_cts['text'].astype(str).str.len()>20]
     classifierlist = classifiers.keys()
+    SUBMODELPATH = os.path.join(MODELPATH,'subtopics/')
+    CLINPREDICTPATH = os.path.join(PREDICTPATH,'clinpredict/')
+    predict_class(SUBMODELPATH,CLINPREDICTPATH,subtopiclist,classifierlist,has_sufficient_info,False)
+    predict_class(MODELPATH,CLINPREDICTPATH,topiclist,classifierlist,has_sufficient_info,False)
+    
+    
+    
+def load_annotations(DATAPATH,MODELPATH,PREDICTPATH,RESULTSPATH,topicsdf,classifiers,newonly = True):
+    from src.common import topic_dict
+    classifierlist = classifiers.keys()
+    CLINPREDICTPATH = os.path.join(PREDICTPATH,'clinpredict/')
+    PUBPREDICTPATH = os.path.join(PREDICTPATH,'pubpredict/')
+    classify_clins(DATAPATH,MODELPATH,PREDICTPATH,classifiers,topic_dict)
+    clin_total_agree = merge_predictions(CLINPREDICTPATH,topic_dict,classifierlist,agreetype='perfect')
     if newonly==True:
-        new_pubs_only,new_topic_ids = check_for_new(RESULTSPATH,topicsdf)
+        new_pubs_only,new_topic_ids = check_for_new(RESULTSPATH,topicsdf,"nonlitcovid")
         all_new_ids = list(set(new_pubs_only).union(set(new_topic_ids)))
-        classify_pubs(MODELPATH,PREDICTPATH,new_pubs_only,topiclist,classifiers)
-        total_agree = merge_predictions(PREDICTPATH,topiclist,classifierlist,agreetype='perfect')
+        classify_pubs(MODELPATH,PUBPREDICTPATH,new_pubs_only,topic_dict,classifiers)
+        total_agree = merge_predictions(PUBPREDICTPATH,topic_dict,classifierlist,'perfect')
         new_total_agree = total_agree.loc[total_agree['_id'].isin(new_pubs_only)].copy()
         new_topics_df = topicsdf.loc[topicsdf['_id'].isin(new_topic_ids)].copy()
-        allnewresults = pd.concat((new_total_agree,new_topics_df),ignore_index=True)
+        allnewresults = pd.concat((new_total_agree,new_topics_df,clin_total_agree),ignore_index=True)
         cleanresults = clean_results(allnewresults)
     else:
         all_ids = get_pub_ids(sourceset="other")
-        classify_pubs(MODELPATH,PREDICTPATH,all_ids,topiclist,classifiers,newonly = False)
-        total_agree = merge_predictions(PREDICTPATH,topiclist,classifierlist,agreetype='perfect')
-        allresults = pd.concat((total_agree,topicsdf),ignore_index=True)
-        cleanresults = clean_results(allresults)    
+        classify_pubs(MODELPATH,PUBPREDICTPATH,all_ids,topic_dict,classifiers,False)
+        total_agree = merge_predictions(PUBPREDICTPATH,topic_dict,classifierlist,'perfect')
+        allresults = pd.concat((total_agree,topicsdf,clin_total_agree),ignore_index=True)
+        cleanresults = clean_results(allresults) 
     cleanresults.to_csv(os.path.join(RESULTSPATH,'topicCats.tsv'),mode='a',sep='\t',header=True)
     updated_results = read_csv(os.path.join(RESULTSPATH,'topicCats.tsv'),delimiter='\t',header=0,index_col=0)
     updated_results.drop_duplicates(subset='_id',keep='first',inplace=True)

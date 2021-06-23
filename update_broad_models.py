@@ -17,5 +17,3 @@ topiclist = topicsdf['topicCategory'].unique().tolist()
 
 classifiers = load_classifiers('best')
 generate_models(MODELPATH,topicsdf,classifiers)
-subtopics_only = load_subtopics_data(SUBDATAPATH,RESULTSPATH,topiclist)
-generate_models(MODELPATH,subtopics_only,classifiers,"all",False)

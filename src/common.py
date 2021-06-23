@@ -1,5 +1,21 @@
 import pandas as pd
 import requests
+import json
+
+
+topic_dict = {'broadtopics':['Behavioral Research','Case Descriptions','Clinical',
+                             'Diagnosis','Environment','Epidemiology','Forecasting',
+                             'Information Sciences','Mechanism','Prevention','Risk Factors',
+                             'Transmission','Treatment'],
+              'subtopics':['Antibody Detection','Biologics','Host Factors','Individual Prevention',
+                           'Medical Care','Pathology-Radiology','Pharmaceutical Treatments',
+                           'Public Health Interventions','Rapid Diagnostics','Repurposing',
+                           'Symptoms','Vaccines','Virus Detection','Prognosis',
+                           'Mechanism of Infection','Mechanism of Transmission',
+                           'Molecular Epidemiology','Host-Intermediate Reservoirs',
+                           'Classical Epidemiology','Rapid Diagnostics','Testing Prevalence',
+                           'Viral Shedding-Persistence','Immunological Response']}
+
 
 def get_ids_from_json(jsonfile):
     idlist = []
@@ -7,6 +23,51 @@ def get_ids_from_json(jsonfile):
         if eachhit["_id"] not in idlist:
             idlist.append(eachhit["_id"])
     return(idlist)
+
+
+def fetch_src_size(source):
+    pubmeta = requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&size=0&aggs=@type")
+    pubjson = json.loads(pubmeta.text)
+    pubcount = int(pubjson["facets"]["@type"]["total"])
+    return(pubcount)
+
+
+def get_source_ids(source):
+    source_size = fetch_src_size(source)
+    r = requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&fields=_id&fetch_all=true")
+    response = json.loads(r.text)
+    idlist = get_ids_from_json(response)
+    try:
+        scroll_id = response["_scroll_id"]
+        while len(idlist) < source_size:
+            r2 = requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&fields=_id&fetch_all=true&scroll_id="+scroll_id)
+            response2 = json.loads(r2.text)
+            idlist2 = set(get_ids_from_json(response2))
+            tmpset = set(idlist)
+            idlist = tmpset.union(idlist2)
+            try:
+                scroll_id = response2["_scroll_id"]
+            except:
+                print("no new scroll id")
+        return(idlist)
+    except:
+        return(idlist)
+    
+
+def get_pub_ids(sourceset):
+    pub_srcs = {"preprint":["bioRxiv","medRxiv"],"litcovid":["litcovid"],
+                "other":["Figshare","Zenodo","MRC Centre for Global Infectious Disease Analysis"],
+                "nonlitcovid":["Figshare","Zenodo","MRC Centre for Global Infectious Disease Analysis",
+                               "bioRxiv","medRxiv"],
+                "all":["Figshare","Zenodo","MRC Centre for Global Infectious Disease Analysis",
+                       "bioRxiv","medRxiv","litcovid"]}
+    sourcelist = pub_srcs[sourceset]
+    allids = []
+    for eachsource in sourcelist:
+        sourceids = get_source_ids(eachsource)
+        allids = list(set(allids).union(set(sourceids)))
+    return(allids)
+
 
 
 def load_classifiers(classifierset_type):
@@ -70,7 +131,43 @@ def batch_fetch_meta(idlist):
         i=i+1
     return(textdf)
 
-    
+ 
+def batch_fetch_keywords(idlist):
+    ## Break the list of ids into smaller chunks so the API doesn't fail the post request
+    runs = round((len(idlist))/100,0)
+    i=0 
+    separator = ','
+    ## Create dummy dataframe to store the meta data
+    textdf = pd.DataFrame(columns = ['_id','abstract','name','keywords'])
+    while i < runs+1:
+        if len(idlist)<100:
+            sample = idlist
+        elif i == 0:
+            sample = idlist[i:(i+1)*100]
+        elif i == runs:
+            sample = idlist[i*100:len(idlist)]
+        else:
+            sample = idlist[i*100:(i+1)*100]
+        sample_ids = separator.join(sample)
+        ## Get the text-based metadata (abstract, title) and save it
+        r = requests.post("https://api.outbreak.info/resources/query/", params = {'q': sample_ids, 'scopes': '_id', 'fields': 'name,abstract,keywords'})
+        if r.status_code == 200:
+            rawresult = pd.read_json(r.text)
+            checkcols = rawresult.columns
+            if (('keywords' not in checkcols) and ('abstract' in checkcols)):
+                rawresult['keywords']=[""]
+            elif (('keywords' in checkcols) and ('abstract' not in checkcols)):
+                rawresult['abstract']=" "
+            elif (('keywords' not in checkcols) and ('abstract' not in checkcols)):
+                rawresult['abstract']=" "
+                rawresult['keywords']=[""]
+            cleanresult = rawresult[['_id','name','abstract','keywords']].loc[rawresult['_score']==1].fillna(" ").copy()
+            cleanresult.drop_duplicates(subset='_id',keep="first", inplace=True)
+            textdf = pd.concat((textdf,cleanresult))
+        i=i+1
+    return(textdf)
+
+
 
 def clean_results(allresults):
     allresults.drop_duplicates(keep="first",inplace=True)

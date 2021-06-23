@@ -35,7 +35,8 @@ def fetch_categorized_data(df):
 
 
 def generate_training_df(df,category):
-    positiveids = df['_id'].loc[df['topicCategory']==category].tolist()
+    tmpdf = df.loc[df['topicCategory']==category]
+    positiveids = tmpdf['_id'].tolist()
     training_set_pos = df[['_id','text']].loc[df['topicCategory']==category].copy()
     training_set_pos['target']='in category'
     max_negs = len(positiveids)
@@ -114,8 +115,12 @@ def run_test(RESULTPATH,topicsdf,classifierset_type='best',export_report=False):
 
 #### Use default to generate new models on ALL available topics.
 #### Otherwise, set 'traintopics' to a specific topicCategory to create a model just on that topicCategory
-def generate_models(MODELPATH,topicsdf,classifiers,traintopics="all"):
-    alldata = fetch_categorized_data(topicsdf)
+def generate_models(MODELPATH,topicsdf,classifiers,traintopics="all",fetch_data=True):
+    if fetch_data == True:
+        rawdata = fetch_categorized_data(topicsdf)
+        alldata = rawdata.loc[rawdata['text'].astype(str).str.len()>3]
+    else:
+        alldata = topicsdf.loc[topicsdf['text'].astype(str).str.len()>3]
     breakdown = alldata.groupby('topicCategory').size().reset_index(name='counts')
     if traintopics != "all":
         eachtopic = traintopics
@@ -133,4 +138,3 @@ def generate_models(MODELPATH,topicsdf,classifiers,traintopics="all"):
                 classifier=classifiers[eachclassifier]
                 classifier.fit(X, trainingset.target)
                 save_model(MODELPATH,classifier,eachclassifier,eachtopic)    
- 
