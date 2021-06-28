@@ -67,6 +67,7 @@ def predict_class(MODELPATH,PREDICTPATH,topiclist,classifierlist,df,newonly = Tr
             predictiondf = pd.DataFrame(list_of_tuples, columns = ['_id', 'prediction'])
             predictiondf['topicCategory']=eachtopic
             predictiondf['classifier']=eachclassifier
+            predictiondf.drop_duplicates(keep='first',inplace=True)
             if newonly == True:
                 predictiondf.to_csv(os.path.join(PREDICTPATH,eachtopic+"_"+eachclassifier+'.tsv'),mode='a',sep='\t',header=True)
             else:
@@ -74,33 +75,16 @@ def predict_class(MODELPATH,PREDICTPATH,topiclist,classifierlist,df,newonly = Tr
             
 
 def get_agreement(PREDICTPATH,eachtopic,classifierlist):
-    agreement = pd.DataFrame(columns=['_id','topicCategory','pos_pred_count','pos_pred_algorithms'])
     classresult = pd.DataFrame(columns=['_id','prediction','topicCategory','classifier'])
     for eachclass in classifierlist:
         tmpfile = read_csv(os.path.join(PREDICTPATH,eachtopic+"_"+eachclass+".tsv"),delimiter='\t',header=0,index_col=0)
         classresult = pd.concat((classresult,tmpfile),ignore_index=True)
+    classresult.drop_duplicates(keep='first',inplace=True)
     posresults = classresult.loc[classresult['prediction']=='in category']
-    agreecounts = posresults.groupby('_id').size().reset_index(name='counts')
-    no_agree = posresults.loc[posresults['_id'].isin(agreecounts['_id'].loc[agreecounts['counts']==1].tolist())].copy()
-    no_agree.rename(columns={'classifier':'pos_pred_algorithms'},inplace=True)
-    no_agree['pos_pred_count']=1
-    no_agree.drop('prediction',axis=1,inplace=True)
-    perfect_agree = posresults.loc[posresults['_id'].isin(agreecounts['_id'].loc[agreecounts['counts']==len(classifierlist)].tolist())].copy()
-    perfect_agree['pos_pred_count']=len(classifierlist)
-    perfect_agree['pos_pred_algorithms']=str(classifierlist)
-    perfect_agree.drop(['prediction','classifier'],axis=1,inplace=True)
-    perfect_agree.drop_duplicates('_id',keep='first',inplace=True)
-    partialcountids = agreecounts['_id'].loc[((agreecounts['counts']>1)&
-                                          (agreecounts['counts']<len(classifierlist)))].tolist()
-    tmplist = []
-    for eachid in list(set(partialcountids)):
-        tmpdf = posresults.loc[posresults['_id']==eachid]
-        tmpdict = {'_id':eachid,'topicCategory':eachtopic,'pos_pred_count':len(tmpdf),
-                   'pos_pred_algorithms':str(tmpdf['classifier'].tolist())}
-        tmplist.append(tmpdict)
-    partial_agree = pd.DataFrame(tmplist)    
-    agreement = pd.concat((agreement,no_agree,partial_agree,perfect_agree),ignore_index=True)
+    agreement = posresults.groupby(['_id','topicCategory'])['classifier'].apply(list).reset_index(name='pos_pred_algorithms')
+    agreement['pos_pred_count'] = agreement['pos_pred_algorithms'].str.len()
     return(agreement)
+
 
 def filter_agreement(PREDICTPATH,topiclist,classifierlist,agreetype='perfect'):
     allagreement = pd.DataFrame(columns=['_id','topicCategory','pos_pred_count','pos_pred_algorithms'])
@@ -146,7 +130,7 @@ def check_for_new(RESULTSPATH,topicsdf,sourceset):
     updated_pubslist = get_pub_ids(sourceset)
     new_pubs_only = [x for x in updated_pubslist if x not in all_ids]
     topics_ids = topicsdf['_id'].unique().tolist()
-    new_topic_ids = [x for x in topics_ids if x not in oldresults]
+    new_topic_ids = [x for x in topics_ids if x not in all_ids]
     return(new_pubs_only,new_topic_ids)
 
 
@@ -163,6 +147,19 @@ def classify_clins(DATAPATH,MODELPATH,PREDICTPATH,classifiers,topic_dict):
     CLINPREDICTPATH = os.path.join(PREDICTPATH,'clinpredict/')
     predict_class(SUBMODELPATH,CLINPREDICTPATH,subtopiclist,classifierlist,has_sufficient_info,False)
     predict_class(MODELPATH,CLINPREDICTPATH,topiclist,classifierlist,has_sufficient_info,False)
+
+
+#### Deal with Risk Factors and Case Descriptions which had to be dealt with differently due to litcovid
+def include_clin(df):
+    df.dropna()
+    clins = df.loc[(df['topicCategory']=='Risk Factors')|(df['topicCategory']=='Case Descriptions')]
+    explicit_clins = df['_id'].loc[df['topicCategory']=='Clinical']
+    missing_clins = clins['_id'].loc[~clins['_id'].isin(explicit_clins)].to_frame(name='_id')
+    missing_clins['topicCategory'] = 'Clinical'
+    df = pd.concat((df,missing_clins),ignore_index=True)
+    df.sort_values('_id',ascending=True,inplace=True)
+    df.drop_duplicates(keep='first',inplace=True)
+    return(df)
     
     
     
@@ -180,18 +177,27 @@ def load_annotations(DATAPATH,MODELPATH,PREDICTPATH,RESULTSPATH,topicsdf,classif
         total_agree = merge_predictions(PUBPREDICTPATH,topic_dict,classifierlist,'perfect')
         new_total_agree = total_agree.loc[total_agree['_id'].isin(new_pubs_only)].copy()
         new_topics_df = topicsdf.loc[topicsdf['_id'].isin(new_topic_ids)].copy()
-        allnewresults = pd.concat((new_total_agree,new_topics_df,clin_total_agree),ignore_index=True)
+        totalnewresults = pd.concat((new_total_agree,new_topics_df,clin_total_agree),ignore_index=True)
+        allnewresults = include_clin(totalnewresults)
+        allnewresults['topicCategory'] = allnewresults['topicCategory'].str.replace('-','/')
+        allnewresults.dropna(axis=0,inplace=True)
+        allnewresults.reset_index(drop=True)
         cleanresults = clean_results(allnewresults)
+        cleanresults.to_csv(os.path.join(RESULTSPATH,'topicCats.tsv'),mode='a',sep='\t',header=True)
     else:
-        all_ids = get_pub_ids(sourceset="other")
+        all_ids = get_pub_ids(sourceset="nonlitcovid")
         classify_pubs(MODELPATH,PUBPREDICTPATH,all_ids,topic_dict,classifiers,False)
         total_agree = merge_predictions(PUBPREDICTPATH,topic_dict,classifierlist,'perfect')
-        allresults = pd.concat((total_agree,topicsdf,clin_total_agree),ignore_index=True)
+        totalresults = pd.concat((total_agree,topicsdf,clin_total_agree),ignore_index=True)
+        allresults = include_clin(totalresults)
+        allresults['topicCategory'] = allresults['topicCategory'].str.replace('-','/')
+        allresults.dropna(axis=0,inplace=True)
+        allresults.reset_index(drop=True)
         cleanresults = clean_results(allresults) 
-    cleanresults.to_csv(os.path.join(RESULTSPATH,'topicCats.tsv'),mode='a',sep='\t',header=True)
+        cleanresults.to_csv(os.path.join(RESULTSPATH,'topicCats.tsv'),mode='w',sep='\t',header=True)
     updated_results = read_csv(os.path.join(RESULTSPATH,'topicCats.tsv'),delimiter='\t',header=0,index_col=0)
     updated_results.drop_duplicates(subset='_id',keep='first',inplace=True)
-    updated_results.to_csv(os.path.join(RESULTSPATH,'topicCats.tsv'),mode='a',sep='\t',header=True)
+    updated_results.to_csv(os.path.join(RESULTSPATH,'topicCats.tsv'),sep='\t',header=True)
     updated_results.to_json(os.path.join(RESULTSPATH,'topicCats.json'), orient='records')
 
     

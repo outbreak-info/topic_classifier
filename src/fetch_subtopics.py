@@ -16,12 +16,13 @@ def load_lit_kw_subcats(SUBDATAPATH):
     return(keysubtopics)
 
 
-def load_lit_subcats(SUBDATAPATH):
-    litsubtopicsfile = os.path.join(SUBDATAPATH,'subtopics.tsv')
+def load_lit_subcats(DATAPATH):
+    SUBDATAPATH = os.path.join(DATAPATH,'subtopics/')
+    litsubtopicsfile = os.path.join(DATAPATH,'subtopics.tsv')
     litsubtopics = read_csv(litsubtopicsfile,delimiter='\t',header=0,index_col=0)
     litsubtopics['topicCategory'] = litsubtopics['topicCategory'].astype(str).str.replace('-','/')
     keysubtopics = load_lit_kw_subcats(SUBDATAPATH)
-    boom = keysubtopics.explode('matching_pmids')
+    boom = keysubtopics.explode('matching_pmids').reset_index(drop=True)
     boom.rename(columns={'matching_pmids':'_id'},inplace=True)
     boom_clean = boom[['_id','topicCategory']].copy()
     boom_clean['topicCategory'] = boom_clean['topicCategory'].astype(str).str.replace(' / ','/')
@@ -58,9 +59,10 @@ def load_clin_cats_data(SUBDATAPATH):
     return(ct_subtopics)
 
     
-def load_subtopics_data(SUBDATAPATH,RESULTSPATH,topic_dict):
+def load_subtopics_data(DATAPATH,RESULTSPATH,topic_dict):
+    SUBDATAPATH = os.path.join(DATAPATH,'subtopics/')
     topiclist = topic_dict['broadtopics']
-    litmergeddf = load_lit_subcats(SUBDATAPATH)
+    litmergeddf = load_lit_subcats(DATAPATH)
     curate_df = load_citsci_data(SUBDATAPATH)
     ct_subtopics = load_clin_cats_data(SUBDATAPATH)
     allsubtopicsdf = pd.concat((ct_subtopics,curate_df,litmergeddf),ignore_index=True)
@@ -72,8 +74,6 @@ def load_subtopics_data(SUBDATAPATH,RESULTSPATH,topic_dict):
     training_to_export.drop_duplicates(keep='first',inplace=True)
     training_to_export['topicCategory'] = training_to_export['topicCategory'].astype(str).str.replace('-','/')
     training_to_export.to_csv(os.path.join(RESULTSPATH,'subtopicCats.tsv'),mode='w',sep='\t',header=True)
-    #cleanresults = clean_results(training_to_export)
-    #cleanresults.to_csv(os.path.join(RESULTSPATH,'subtopicCats.tsv'),mode='w',sep='\t',header=True)
     with open(os.path.join(SUBDATAPATH,'subtopics_only.pickle'),'wb') as save_file:
         pickle.dump(subtopics_only,save_file)
     return(subtopics_only)

@@ -17,59 +17,8 @@ topic_dict = {'broadtopics':['Behavioral Research','Case Descriptions','Clinical
                            'Viral Shedding-Persistence','Immunological Response']}
 
 
-def get_ids_from_json(jsonfile):
-    idlist = []
-    for eachhit in jsonfile["hits"]:
-        if eachhit["_id"] not in idlist:
-            idlist.append(eachhit["_id"])
-    return(idlist)
 
-
-def fetch_src_size(source):
-    pubmeta = requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&size=0&aggs=@type")
-    pubjson = json.loads(pubmeta.text)
-    pubcount = int(pubjson["facets"]["@type"]["total"])
-    return(pubcount)
-
-
-def get_source_ids(source):
-    source_size = fetch_src_size(source)
-    r = requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&fields=_id&fetch_all=true")
-    response = json.loads(r.text)
-    idlist = get_ids_from_json(response)
-    try:
-        scroll_id = response["_scroll_id"]
-        while len(idlist) < source_size:
-            r2 = requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&fields=_id&fetch_all=true&scroll_id="+scroll_id)
-            response2 = json.loads(r2.text)
-            idlist2 = set(get_ids_from_json(response2))
-            tmpset = set(idlist)
-            idlist = tmpset.union(idlist2)
-            try:
-                scroll_id = response2["_scroll_id"]
-            except:
-                print("no new scroll id")
-        return(idlist)
-    except:
-        return(idlist)
-    
-
-def get_pub_ids(sourceset):
-    pub_srcs = {"preprint":["bioRxiv","medRxiv"],"litcovid":["litcovid"],
-                "other":["Figshare","Zenodo","MRC Centre for Global Infectious Disease Analysis"],
-                "nonlitcovid":["Figshare","Zenodo","MRC Centre for Global Infectious Disease Analysis",
-                               "bioRxiv","medRxiv"],
-                "all":["Figshare","Zenodo","MRC Centre for Global Infectious Disease Analysis",
-                       "bioRxiv","medRxiv","litcovid"]}
-    sourcelist = pub_srcs[sourceset]
-    allids = []
-    for eachsource in sourcelist:
-        sourceids = get_source_ids(eachsource)
-        allids = list(set(allids).union(set(sourceids)))
-    return(allids)
-
-
-
+#### Classifiers
 def load_classifiers(classifierset_type):
     from sklearn.ensemble import RandomForestClassifier
     from sklearn.naive_bayes import MultinomialNB
@@ -96,6 +45,94 @@ def load_classifiers(classifierset_type):
         return(all_available)
 
 
+
+
+
+#### Outbreak.info API query functions
+def get_ids_from_json(jsonfile):
+    idlist = []
+    for eachhit in jsonfile["hits"]:
+        if eachhit["_id"] not in idlist:
+            idlist.append(eachhit["_id"])
+    return(idlist)
+
+
+#### Query by source
+def fetch_src_size(source):
+    pubmeta = requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&size=0&aggs=@type")
+    pubjson = json.loads(pubmeta.text)
+    pubcount = int(pubjson["facets"]["@type"]["total"])
+    return(pubcount)
+
+
+def get_source_ids(source):
+    source_size = fetch_src_size(source)
+    r = requests.get('https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"'+source+'"))&fields=_id&fetch_all=true')
+    response = json.loads(r.text)
+    idlist = get_ids_from_json(response)
+    try:
+        scroll_id = response['_scroll_id']
+        while len(idlist) < source_size:
+            r2 = requests.get('https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"'+source+'"))&fields=_id&fetch_all=true&scroll_id='+scroll_id)
+            response2 = json.loads(r2.text)
+            idlist2 = set(get_ids_from_json(response2))
+            tmpset = set(idlist)
+            idlist = tmpset.union(idlist2)
+            try:
+                scroll_id = response2['_scroll_id']
+            except:
+                print("no new scroll id")
+        return(idlist)
+    except:
+        return(idlist)
+    
+
+def get_pub_ids(sourceset):
+    pub_srcs = {"preprint":["bioRxiv","medRxiv"],"litcovid":["litcovid"],
+                "other":["Figshare","Zenodo","MRC Centre for Global Infectious Disease Analysis"],
+                "nonlitcovid":["Figshare","Zenodo","MRC Centre for Global Infectious Disease Analysis",
+                               "bioRxiv","medRxiv"],
+                "all":["Figshare","Zenodo","MRC Centre for Global Infectious Disease Analysis",
+                       "bioRxiv","medRxiv","litcovid"]}
+    sourcelist = pub_srcs[sourceset]
+    allids = []
+    for eachsource in sourcelist:
+        sourceids = get_source_ids(eachsource)
+        allids = list(set(allids).union(set(sourceids)))
+    return(allids)
+
+
+#### Query by search terms
+def fetch_query_size(query):
+    pubmeta = requests.get('https://api.outbreak.info/resources/query?q=(("'+query+'") AND (@type:Publication))&size=0&aggs=@type')
+    pubjson = json.loads(pubmeta.text)
+    pubcount = int(pubjson["facets"]["@type"]["total"])
+    return(pubcount)
+
+
+def get_query_ids(query):
+    query_size = fetch_query_size(query)
+    r = requests.get('https://api.outbreak.info/resources/query?q=(("'+query+'") AND (@type:Publication))&fields=_id&fetch_all=true')
+    response = json.loads(r.text)
+    idlist = get_ids_from_json(response)
+    try:
+        scroll_id = response["_scroll_id"]
+        while len(idlist) < query_size:
+            r2 = requests.get('https://api.outbreak.info/resources/query?q=(("'+query+'") AND (@type:Publication))&fields=_id&fetch_all=true&scroll_id='+scroll_id)
+            response2 = json.loads(r2.text)
+            idlist2 = set(get_ids_from_json(response2))
+            tmpset = set(idlist)
+            idlist = tmpset.union(idlist2)
+            try:
+                scroll_id = response2["_scroll_id"]
+            except:
+                print("no new scroll id")
+        return(idlist)
+    except:
+        return(idlist)
+
+
+#### Retrieve metadata
 def batch_fetch_meta(idlist):
     ## Break the list of ids into smaller chunks so the API doesn't fail the post request
     runs = round((len(idlist))/100,0)
@@ -169,24 +206,11 @@ def batch_fetch_keywords(idlist):
 
 
 
+#### Formatting functions
 def clean_results(allresults):
-    allresults.drop_duplicates(keep="first",inplace=True)
-    counts = allresults.groupby('_id').size().reset_index(name='counts')
-    duplicates = counts.loc[counts['counts']>1]
-    singles = counts.loc[counts['counts']==1]
-    dupids = duplicates['_id'].unique().tolist()
-    tmplist = []
-    for eachid in dupids:
-        catlist = allresults['topicCategory'].loc[allresults['_id']==eachid].tolist()
-        tmplist.append({'_id':eachid,'topicCategory':catlist})
-    tmpdf = pd.DataFrame(tmplist)  
-    tmpsingledf = allresults[['_id','topicCategory']].loc[allresults['_id'].isin(singles['_id'].tolist())]
-    idlist = tmpsingledf['_id'].tolist()
-    catlist = tmpsingledf['topicCategory'].tolist()
-    cattycat = [[x] for x in catlist]
-    list_of_tuples = list(zip(idlist,cattycat))
-    singledf = pd.DataFrame(list_of_tuples, columns = ['_id', 'topicCategory']) 
-    cleanresults = pd.concat((tmpdf,singledf),ignore_index=True)
+    allresults.drop_duplicates(keep='first',inplace=True)
+    cleanresults = allresults.groupby('_id')['topicCategory'].apply(list).reset_index(name='newTopicCategory')
+    cleanresults.rename(columns={'newTopicCategory':'topicCategory'},inplace=True)
     return(cleanresults) 
 
 
@@ -198,4 +222,8 @@ def merge_texts(df):
     df['text'] = df['text'].str.replace(r'\^[a-zA-Z]\s+', ' ')
     df['text'] = df['text'].str.lower()   
     return(df)
+
+
+
+
 

@@ -18,7 +18,7 @@ littopicsdf = read_csv(littopicsfile,delimiter='\t',header=0,index_col=0)
 offtopicsdf = read_csv(offtopicsfile,delimiter='\t',header=0,index_col=0)
 
 classifiers = load_classifiers('best')
-models_to_update = input("Which models need to be updated? (b: broad topics, s: sub-topics, a: all topics, s: single topic")
+models_to_update = input("Which models need to be updated? (b: broad topics, c: child/sub-topics, a: all topics, s: single topic")
 
 if models_to_update == 'a':
     topicsdf = pd.concat((littopicsdf,offtopicsdf),ignore_index=True)

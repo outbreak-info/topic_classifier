@@ -26,7 +26,7 @@ def fetch_categorized_data(df):
     alldata = pd.DataFrame(columns=['_id','name','abstract','description','text','topicCategory'])
     breakdown = df.groupby('topicCategory').size().reset_index(name='counts')
     for eachtopic in breakdown['topicCategory'].tolist():
-        tmpids = df['_id'].loc[df['topicCategory']==eachtopic]
+        tmpids = df['_id'].loc[df['topicCategory']==eachtopic].astype(str).unique().tolist()
         tmptxtdf = batch_fetch_meta(tmpids)
         tmptxtdf = merge_texts(tmptxtdf)
         tmptxtdf['topicCategory']=eachtopic
@@ -35,7 +35,8 @@ def fetch_categorized_data(df):
 
 
 def generate_training_df(df,category):
-    tmpdf = df.loc[df['topicCategory']==category]
+    tmpdf = df.loc[df['topicCategory']==category].copy()
+    tmpdf.dropna(subset=['_id','text'],axis=0,inplace=True)
     positiveids = tmpdf['_id'].tolist()
     training_set_pos = df[['_id','text']].loc[df['topicCategory']==category].copy()
     training_set_pos['target']='in category'

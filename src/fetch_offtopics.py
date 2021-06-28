@@ -9,44 +9,16 @@ import json
 import pickle
 
 #### Pull ids from a json file
-from src.common import get_ids_from_json
+from src.common import *
 
 
+
+#### Keyword load functions
 def get_keypath(DATAPATH):
     KEYPATH = os.path.join(DATAPATH,'keywords/')
     keydirfiles = os.listdir(KEYPATH)
     KEYFILES = [x for x in keydirfiles if '.txt' in x]
     return(KEYPATH,KEYFILES)
-
-
-def fetch_query_size(query):
-    pubmeta = requests.get('https://api.outbreak.info/resources/query?q=(("'+query+'") AND (@type:Publication))&size=0&aggs=@type')
-    pubjson = json.loads(pubmeta.text)
-    pubcount = int(pubjson["facets"]["@type"]["total"])
-    return(pubcount)
-
-#### Ping the API and get all the ids for a specific source and scroll through the source until number of ids matches meta
-def get_query_ids(query):
-    query_size = fetch_query_size(query)
-    r = requests.get('https://api.outbreak.info/resources/query?q=(("'+query+'") AND (@type:Publication))&fields=_id&fetch_all=true')
-    response = json.loads(r.text)
-    idlist = get_ids_from_json(response)
-    try:
-        scroll_id = response["_scroll_id"]
-        while len(idlist) < query_size:
-            r2 = requests.get('https://api.outbreak.info/resources/query?q=(("'+query+'") AND (@type:Publication))&fields=_id&fetch_all=true&scroll_id='+scroll_id)
-            response2 = json.loads(r2.text)
-            idlist2 = set(get_ids_from_json(response2))
-            tmpset = set(idlist)
-            idlist = tmpset.union(idlist2)
-            try:
-                scroll_id = response2["_scroll_id"]
-            except:
-                print("no new scroll id")
-        return(idlist)
-    except:
-        return(idlist)
-
 
 def load_search_terms(DATAPATH):
     KEYPATH,KEYFILES = get_keypath(DATAPATH)
@@ -61,24 +33,39 @@ def load_search_terms(DATAPATH):
     return(keyword_dict)
 
 
-def load_category_ids(DATAPATH):
-    keyword_dict = load_search_terms(DATAPATH)
-    cat_dict = {}
-    for category in keyword_dict.keys():
-        allids = []
-        idlist = []
-        keywordlist = keyword_dict[category]
-        for eachkey in keywordlist:
-            idlist = get_query_ids(eachkey)
-            allids = list(set(allids).union(set(idlist)))
-        cat_dict[category]=allids
-    return(cat_dict)
+def get_subpath(DATAPATH,topic):
+    keystring = 'subtopics/keywords/'+topic+'/'
+    SUBPATH = os.path.join(DATAPATH,keystring)
+    SUBFILES = os.listdir(SUBPATH)
+    return(SUBPATH,SUBFILES)
+
+
+def load_sub_terms(DATAPATH,topic):
+    SUBPATH,SUBFILES = get_subpath(DATAPATH,topic)
+    keyword_dict = {}
+    for eachfile in SUBFILES:
+        filename = eachfile.split('.')[0]
+        keywords = []
+        with open(os.path.join(SUBPATH,eachfile),'r') as readfile:
+            for eachline in readfile:
+                keywords.append(eachline.strip())
+        keyword_dict[filename]=keywords
+    return(keyword_dict)
 
 
 
+#### LitCovid querying functions
 ## Search litcovid for a term and retrieve the pmids
-def search_litcovid_ids(searchterm):
-    check_litcovid = requests.get('https://www.ncbi.nlm.nih.gov/research/coronavirus-api/export/tsv?text="'+searchterm+'"&filters={}')
+def search_litcovid_ids(searchterm,topic=False):
+    baseurl = 'https://www.ncbi.nlm.nih.gov/research/coronavirus-api/export/tsv?text="'
+    filterurl = '"&filters={"topics":["'
+    urlend = '"]}'
+    nofilter = '"&filters={}'
+    if topic==False:
+        litsearchurl = baseurl+searchterm+nofilter
+    else:
+        litsearchurl = baseurl+searchterm+filterurl+topic+urlend
+    check_litcovid = requests.get(litsearchurl)
     litcovid_data = check_litcovid.text.split('\n')[34:]
     pmids = []
     for line in litcovid_data:
@@ -88,80 +75,128 @@ def search_litcovid_ids(searchterm):
     cleanpmids = ['pmid'+x for x in pmids if x != ""]
     return(cleanpmids)
 
+
+
+
 ## load the list of search terms for each topicCategory and push it to either outbreak (default) or litcovid
 ## returns an id list
-def category_id_check(DATAPATH,source='outbreak'):
-    keyword_dict = load_search_terms(DATAPATH)
+def category_id_check(DATAPATH,topic=False,source='outbreak',topic_type='broadtopic'):
+    if 'broad' in topic_type:
+        keyword_dict = load_search_terms(DATAPATH)
+    else:
+        mapped_topics = {'Treatment':['Prevention','Treatment','Case Report'],
+                         'Transmission':['Transmission','Prevention'],
+                         'Prevention':['Prevention','Case Report']}
+        special_cases = {'Mechanism of Transmission':['Mechanism','Transmission']}
+        keyword_dict = load_sub_terms(DATAPATH,topic)
     allids = []
-    if source == 'litcovid':
+    if source == 'outbreak':
+        for category in keyword_dict.keys():  
+            keywordlist = keyword_dict[category]
+            for eachkey in keywordlist:
+                idlist = get_query_ids(eachkey)
+                allids.append({'category':category,'searchterm':eachkey,'ids':idlist})
+        idcheck = pd.DataFrame(allids)       
+    if ((source == 'litcovid') and ('broad' in topic_type)):
         for category in keyword_dict.keys():  
             keywordlist = keyword_dict[category]
             for eachkey in keywordlist:
                 idlist = search_litcovid_ids(eachkey)
                 allids.append({'category':category,'searchterm':eachkey,'ids':idlist})
         idcheck = pd.DataFrame(allids)
-    else:
-        for category in keyword_dict.keys():  
+    if ((source == 'litcovid') and ('broad' not in topic_type)):
+        for category in keyword_dict.keys():
             keywordlist = keyword_dict[category]
-            for eachkey in keywordlist:
-                idlist = get_query_ids(eachkey)
-                allids.append({'category':category,'searchterm':eachkey,'ids':idlist})
+            if category=='Mechanism of Transmission':
+                litcovidtopics = read_csv(os.path.join(DATAPATH,'litcovidtopics.tsv'),delimiter='\t',index_col=0,header=0)
+                mechtrans = litcovidtopics.loc[(litcovidtopics['topicCategory']=='Mechanism')|
+                                               (litcovidtopics['topicCategory']=='Transmission')].copy()
+                mechtrans.drop_duplicates(keep='first',inplace=True)
+                freqs = mechtrans.groupby('_id').size().reset_index(name='counts')
+                meetsreqs = freqs['_id'].loc[freqs['counts']>1].unique().tolist()
+                for category in keyword_dict.keys():  
+                    keywordlist = keyword_dict[category]
+                    for eachkey in keywordlist:
+                        idlist = search_litcovid_ids(eachkey,topic)
+                        totalids = list(set(idlist).union(set(meetsreqs)))
+                        allids.append({'category':category,'searchterm':eachkey,'ids':totalids})                    
+            elif topic == 'Epidemiology':
+                topic = False
+                for eachkey in keywordlist:
+                    idlist = search_litcovid_ids(eachkey,topic)
+                    allids.append({'category':category,'searchterm':eachkey,'ids':idlist})                    
+            elif topic in (mapped_topics.keys()):
+                topic_sublist = mapped_topics[topic]
+                for eachkey in keywordlist:
+                    totalids = []
+                    for eachtopic in topic_sublist:
+                        idlist = search_litcovid_ids(eachkey,eachtopic)
+                        totalids = list(set(idlist).union(set(totalids)))
+                    allids.append({'category':category,'searchterm':eachkey,'ids':totalids})
+            else:
+                for eachkey in keywordlist:
+                    idlist = search_litcovid_ids(eachkey,topic)
+                    allids.append({'category':category,'searchterm':eachkey,'ids':idlist})
         idcheck = pd.DataFrame(allids)
     return(idcheck)
+
 
 
 ## Pull the id lists after search outbreak and litcovid and compare them
 ## keep only ids in common for training purposes
 ## Note, this will remove all preprints from the training set since litcovid does not have them
-def get_in_common_ids(DATAPATH):
-    outbreakids = category_id_check(DATAPATH)
-    litcovidids = category_id_check(DATAPATH,source='litcovid')
-    mergedf = outbreakids.merge(litcovidids,on=(['category','searchterm']),how='outer')
-    i=0
-    tmplist = []
-    while i <len(mergedf):
-        idsincommon = list(set(mergedf.iloc[i]['ids_x']).intersection(set(mergedf.iloc[i]['ids_y'])))
-        tmplist.append({'category':mergedf.iloc[i]['category'],
-                        'searchterm':mergedf.iloc[i]['searchterm'],
-                        'len_ids_x':len(mergedf.iloc[i]['ids_x']),
-                        'len_ids_y':len(mergedf.iloc[i]['ids_y']),
-                        'len_clean_ids':len(idsincommon),
-                        'clean_ids':idsincommon})
-        i=i+1
-    cleandf = pd.DataFrame(tmplist)
-    return(cleandf)   
-
-
-def generate_training_dict(DATAPATH,RESULTSPATH,savefile = False):
-    cleandf = get_in_common_ids(DATAPATH)
-    training_dict = {}
-    for eachcat in cleandf['category'].unique().tolist(): 
-        j=0
-        tmpdf = cleandf.loc[cleandf['category']==eachcat]
-        allids = []
-        while j<len(tmpdf):
-            allids = list(set(allids).union(set(tmpdf.iloc[j]['clean_ids'])))
-            j=j+1
-        training_dict[eachcat]=allids
-    if savefile == False:
-        return(training_dict)
+def get_in_common_ids(DATAPATH,topic_type='broadtopic'):
+    if 'broad' in topic_type:
+        outbreakids = category_id_check(DATAPATH)
+        litcovidids = category_id_check(DATAPATH,source='litcovid')
+        mergedf = outbreakids.merge(litcovidids,on=(['category','searchterm']),how='outer')
+        mergedf['clean_ids'] = mergedf.apply(lambda row: list(set(row['ids_x']).intersection(set(row['ids_y']))),axis=1)
+        mergedf['len_clean_ids'] = mergedf['clean_ids'].str.len()
+        mergedf['len_ids_x'] = mergedf['ids_x'].str.len()
+        mergedf['len_ids_y'] = mergedf['ids_y'].str.len()
+        cleandf = mergedf.drop(columns=['ids_x','ids_y'])
     else:
-        with open(os.path.join(RESULTSPATH,"training_dict.json"), "w") as outfile: 
-            json.dump(training_dict, outfile)        
+        maintopics = ['Diagnosis',
+                  'Epidemiology',
+                  'Mechanism',
+                  'Prevention',
+                  'Transmission',
+                  'Treatment']
+        cleandf = pd.DataFrame(columns=['category','searchterm','len_ids_x','len_ids_y','len_clean_ids','clean_ids'])
+        for topic in maintopics:
+            outbreakids = category_id_check(DATAPATH,topic,topic_type='subtopic')
+            litcovidids = category_id_check(DATAPATH,topic,source='litcovid',topic_type='subtopic')
+            mergedf = outbreakids.merge(litcovidids,on=(['category','searchterm']),how='outer')
+            mergedf['clean_ids'] = mergedf.apply(lambda row: list(set(row['ids_x']).intersection(set(row['ids_y']))),axis=1)
+            mergedf['len_clean_ids'] = mergedf['clean_ids'].str.len()
+            mergedf['len_ids_x'] = mergedf['ids_x'].str.len()
+            mergedf['len_ids_y'] = mergedf['ids_y'].str.len()
+            mergedf.drop(columns=['ids_x','ids_y'],inplace=True)
+            cleandf = pd.concat((cleandf,mergedf),ignore_index=True)
+    return(cleandf)
 
-def transform_training_dict(training_dict):
-    trainingdf = pd.DataFrame(columns=['_id','topicCategory'])
-    for eachcat in training_dict.keys():
-        idlist = pd.DataFrame(training_dict[eachcat])
-        idlist.rename(columns={0:'_id'},inplace=True)
-        idlist['topicCategory']=eachcat
-        trainingdf = pd.concat((trainingdf,idlist),ignore_index=True)
-    return(trainingdf)
 
 
+def generate_training_data(DATAPATH,RESULTSPATH,topic_type='broadtopic',savefile = False):
+    if 'broad' in topic_type:
+        cleandf = get_in_common_ids(DATAPATH,'broadtopic')
+    else:
+        cleandf = get_in_common_ids(DATAPATH,'subtopic')
+    boom = cleandf.explode('clean_ids')
+    boomclean = boom[['category','clean_ids']].copy()
+    boomclean.drop_duplicates(keep='first',inplace=True)
+    trainingdf = boomclean.groupby('category')['clean_ids'].apply(list)
+    boomclean.rename(columns={'category':'topicCategory','clean_ids':'_id'},inplace=True)
+    if savefile == False:
+        return(boomclean)
+    else:
+        with open(os.path.join(RESULTSPATH,"trainingdf.pickle"), "wb") as outfile: 
+            pickle.dump(trainingdf, outfile) 
+
+            
+            
 def get_other_topics(DATAPATH,RESULTSPATH):
-    training_dict = generate_training_dict(DATAPATH,RESULTSPATH)
-    trainingdf = transform_training_dict(training_dict)
+    trainingdf = generate_training_data(DATAPATH,RESULTSPATH,'broadtopic')
     trainingdf.to_csv(os.path.join(DATAPATH,'othertopics.tsv'),sep='\t',header=True)
     
 
