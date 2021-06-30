@@ -1,0 +1,10 @@
+hospital care
+prehospital care
+standard of care
+medical care
+supportive care
+palliative care
+terminal care
+psychological care
+icu treatment
+intubation

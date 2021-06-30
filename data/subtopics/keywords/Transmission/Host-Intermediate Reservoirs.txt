@@ -1,0 +1,10 @@
+bats
+pets
+zoonosis
+One health
+dogs
+cats
+mink
+animal
+pig
+bird
