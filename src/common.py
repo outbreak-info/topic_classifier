@@ -1,7 +1,8 @@
 import pandas as pd
 import requests
 import json
-
+from datetime import datetime
+import time
 
 topic_dict = {'broadtopics':['Behavioral Research','Case Descriptions','Clinical',
                              'Diagnosis','Environment','Epidemiology','Forecasting',
@@ -225,5 +226,34 @@ def merge_texts(df):
 
 
 
+
+
+def get_delay(date):
+    try:
+        date = datetime.strptime(date, '%a, %d %b %Y %H:%M:%S GMT')
+        timeout = int((date - datetime.now()).total_seconds())
+    except ValueError:
+        timeout = int(date)
+    return timeout
+
+
+
+def make_request(params):
+    wikidata_url = 'https://query.wikidata.org/sparql'
+    r = requests.get(wikidata_url, params)
+    if r.status_code == 200:
+        if r.json()['results']['bindings']:
+            return r.json()
+        else:
+            return None
+    if r.status_code == 500:
+        return None
+    if r.status_code == 403:
+        return None
+    if r.status_code == 429:
+        timeout = get_delay(r.headers['retry-after'])
+        print('Timeout {} m {} s'.format(timeout // 60, timeout % 60))
+        time.sleep(timeout)
+        make_request(params)
 
 

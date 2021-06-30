@@ -114,14 +114,15 @@ def classify_pubs(MODELPATH,PUBPREDICTPATH,all_ids,topic_dict,classifiers,newonl
     topiclist = topic_dict['broadtopics']
     subtopiclist = topic_dict['subtopics']
     alldf = batch_fetch_meta(all_ids)
-    alldata = merge_texts(alldf)    
+    alldata = merge_texts(alldf)
+    can_classify = alldata.loc[((alldata['text'].str.len()>20)&(~alldata['_id'].isna()))]
     classifierlist = classifiers.keys()
     if newonly == True:
-        predict_class(MODELPATH,PUBPREDICTPATH,topiclist,classifierlist,alldata,True)
-        predict_class(SUBMODELPATH,PUBPREDICTPATH,subtopiclist,classifierlist,alldata,True)
+        predict_class(MODELPATH,PUBPREDICTPATH,topiclist,classifierlist,can_classify,True)
+        predict_class(SUBMODELPATH,PUBPREDICTPATH,subtopiclist,classifierlist,can_classify,True)
     else:
-        predict_class(MODELPATH,PUBPREDICTPATH,topiclist,classifierlist,alldata,False)
-        predict_class(SUBMODELPATH,PUBPREDICTPATH,subtopiclist,classifierlist,alldata,False)
+        predict_class(MODELPATH,PUBPREDICTPATH,topiclist,classifierlist,can_classify,False)
+        predict_class(SUBMODELPATH,PUBPREDICTPATH,subtopiclist,classifierlist,can_classify,False)
 
         
 def check_for_new(RESULTSPATH,topicsdf,sourceset):
@@ -196,7 +197,7 @@ def load_annotations(DATAPATH,MODELPATH,PREDICTPATH,RESULTSPATH,topicsdf,classif
         cleanresults = clean_results(allresults) 
         cleanresults.to_csv(os.path.join(RESULTSPATH,'topicCats.tsv'),mode='w',sep='\t',header=True)
     updated_results = read_csv(os.path.join(RESULTSPATH,'topicCats.tsv'),delimiter='\t',header=0,index_col=0)
-    updated_results.drop_duplicates(subset='_id',keep='first',inplace=True)
+    updated_results.drop_duplicates(subset='_id',keep='last',inplace=True)
     updated_results.to_csv(os.path.join(RESULTSPATH,'topicCats.tsv'),sep='\t',header=True)
     updated_results.to_json(os.path.join(RESULTSPATH,'topicCats.json'), orient='records')
 

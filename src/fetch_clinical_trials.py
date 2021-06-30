@@ -6,6 +6,8 @@ from pandas import read_csv
 import re
 from collections import OrderedDict
 import pickle
+import time
+
 
 
 from src.common import *
@@ -115,11 +117,13 @@ def parse_wikidata(data):
             }))
     tmpdf = pd.DataFrame(tmplist)
     return(tmpdf)
-        
+
+
+
     
 def get_wd_drugs(): 
     repurposetypes = ['Q12140', 'Q35456', 'Q28885102','Q8386']
-    url = 'https://query.wikidata.org/sparql'
+    headers = {'User-Agent': 'outbreak resource topic classifier bot (https://outbreak.info/; help@outbreak.info)'}
     querystart = """
     SELECT
       ?item ?itemLabel ?itemAltLabel
@@ -134,12 +138,19 @@ def get_wd_drugs():
     repurpose = pd.DataFrame(columns=['wdid','drug_name','name','alias'])
     for eachwdid in repurposetypes:
         query = querystart+eachwdid+queryend
-        r = requests.get(url, params = {'format': 'json', 'query': query})
-        data = r.json()
+        params = {'format': 'json', 'query': query, 'headers': headers}
+        data = make_request(params)
         tmpdf = parse_wikidata(data)
         repurpose = pd.concat((repurpose,tmpdf),ignore_index=True)
+        time.sleep(1)
     repurpose.drop_duplicates(keep='first',inplace=True)
     return(repurpose)
+
+
+
+
+
+
 
 
 def clean_drugs(clin_meta):

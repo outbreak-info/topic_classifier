@@ -29,7 +29,7 @@ get_other_topics(DATAPATH,RESULTSPATH)
 update_clin_cats(DATAPATH,CLINDATAPATH)
 get_sub_topics(DATAPATH,RESULTSPATH)
 map_keywords(DATAPATH)
-subtopics_only = load_subtopics_data(SUBDATAPATH,RESULTSPATH,topic_dict)
+subtopics_only = load_subtopics_data(DATAPATH,RESULTSPATH,topic_dict)
 
 
 #### Refresh the classification of other resources

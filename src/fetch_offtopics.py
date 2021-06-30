@@ -85,8 +85,7 @@ def category_id_check(DATAPATH,topic=False,source='outbreak',topic_type='broadto
         keyword_dict = load_search_terms(DATAPATH)
     else:
         mapped_topics = {'Treatment':['Prevention','Treatment','Case Report'],
-                         'Transmission':['Transmission','Prevention'],
-                         'Prevention':['Prevention','Case Report']}
+                         'Transmission':['Transmission','Prevention']}
         special_cases = {'Mechanism of Transmission':['Mechanism','Transmission']}
         keyword_dict = load_sub_terms(DATAPATH,topic)
     allids = []

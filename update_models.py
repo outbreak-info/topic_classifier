@@ -18,24 +18,35 @@ littopicsdf = read_csv(littopicsfile,delimiter='\t',header=0,index_col=0)
 offtopicsdf = read_csv(offtopicsfile,delimiter='\t',header=0,index_col=0)
 
 classifiers = load_classifiers('best')
-models_to_update = input("Which models need to be updated? (b: broad topics, c: child/sub-topics, a: all topics, s: single topic")
+
+models_to_update = 'i'
+while models_to_update not in ['b','a','s','c']:
+    models_to_update = input("Which models need to be updated? (b: broad topics, c: child/sub-topics, a: all topics, s: single topic")
 
 if models_to_update == 'a':
     topicsdf = pd.concat((littopicsdf,offtopicsdf),ignore_index=True)
+    topicsdf.dropna(axis=0,inplace=True)
     topiclist = topicsdf['topicCategory'].unique().tolist()
     generate_models(MODELPATH,topicsdf,classifiers) 
-    subtopics_only = load_subtopics_data(SUBDATAPATH,RESULTSPATH,topic_dict)
+    subtopics_only = load_subtopics_data(DATAPATH,RESULTSPATH,topic_dict)
     generate_models(SUBMODELPATH,subtopics_only,classifiers,"all",False)
 elif models_to_update == 'b':
     topicsdf = pd.concat((littopicsdf,offtopicsdf),ignore_index=True)
+    topicsdf.dropna(axis=0,inplace=True)
     topiclist = topicsdf['topicCategory'].unique().tolist()
     generate_models(MODELPATH,topicsdf,classifiers)
-elif models_to_update == 's':
-    subtopics_only = load_subtopics_data(SUBDATAPATH,RESULTSPATH,topic_dict)
+elif models_to_update == 'c':
+    subtopics_only = load_subtopics_data(DATAPATH,RESULTSPATH,topic_dict)
+    subtopics_only.dropna(axis=0,inplace=True)
     generate_models(SUBMODELPATH,subtopics_only,classifiers,"all",False)
-else:
+elif models_to_update == 's':
     topic_to_check = input("enter the topic Category: ")
-    try:
+    if topic_to_check in topic_dict['broadtopics']:
+        topicsdf = pd.concat((littopicsdf,offtopicsdf),ignore_index=True)
+        topicsdf.dropna(axis=0,inplace=True)
+        topiclist = topicsdf['topicCategory'].unique().tolist()
         generate_models(MODELPATH,topicsdf,classifiers,topic_to_check)
-    except:
+    else:
+        subtopics_only = load_subtopics_data(DATAPATH,RESULTSPATH,topic_dict)
+        subtopics_only.dropna(axis=0,inplace=True)
         generate_models(SUBMODELPATH,subtopics_only,classifiers,topic_to_check,False)        
