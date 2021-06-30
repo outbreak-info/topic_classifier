@@ -242,14 +242,11 @@ def make_request(params):
     wikidata_url = 'https://query.wikidata.org/sparql'
     r = requests.get(wikidata_url, params)
     if r.status_code == 200:
-        if r.json()['results']['bindings']:
-            return r.json()
-        else:
-            return None
+        return r
     if r.status_code == 500:
-        return None
+        return 0
     if r.status_code == 403:
-        return None
+        return 0
     if r.status_code == 429:
         timeout = get_delay(r.headers['retry-after'])
         print('Timeout {} m {} s'.format(timeout // 60, timeout % 60))

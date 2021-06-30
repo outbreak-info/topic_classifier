@@ -121,7 +121,8 @@ def parse_wikidata(data):
 
 
     
-def get_wd_drugs(): 
+def get_wd_drugs(DATAPATH): 
+    WIKIDATAPATH = os.path.join(DATAPATH,'from wikidata/')
     repurposetypes = ['Q12140', 'Q35456', 'Q28885102','Q8386']
     headers = {'User-Agent': 'outbreak resource topic classifier bot (https://outbreak.info/; help@outbreak.info)'}
     querystart = """
@@ -139,7 +140,14 @@ def get_wd_drugs():
     for eachwdid in repurposetypes:
         query = querystart+eachwdid+queryend
         params = {'format': 'json', 'query': query, 'headers': headers}
-        data = make_request(params)
+        r = make_request(params)
+        if r != 0:
+            data = r.json()
+            with open(os.path.join(WIKIDATAPATH,eachwdid+'.pickle'),'wb') as dumpfile:
+                pickle.dump(data,dumpfile)
+        else:
+            with open(os.path.join(WIKIDATAPATH,eachwdid+'.pickle'),'rb') as loadfile:
+                data = pickle.load(loadfile)  
         tmpdf = parse_wikidata(data)
         repurpose = pd.concat((repurpose,tmpdf),ignore_index=True)
         time.sleep(1)
@@ -165,13 +173,13 @@ def clean_drugs(clin_meta):
     return(drugs)
 
 
-def get_repurpose(clin_meta):
+def get_repurpose(DATAPATH,clin_meta):
     drugs = clean_drugs(clin_meta)
     drug_word_freq = drugs.groupby('interventionName').size().reset_index(name='counts')
     drug_word_freq.sort_values('counts',ascending=False,inplace=True)
     drugfreq = drug_word_freq.loc[drug_word_freq['counts']>1].copy()
     druglist = drugfreq['interventionName'].unique().tolist() 
-    repurposedf = get_wd_drugs()
+    repurposedf = get_wd_drugs(DATAPATH)
     all_drugs = list(set(repurposedf['name'].unique().tolist()).union(set(repurposedf['alias'].unique().tolist())))
     druglist_lower = [x.lower() for x in druglist]
     all_drugs_lower = [x.lower() for x in all_drugs]
@@ -181,8 +189,8 @@ def get_repurpose(clin_meta):
     return(drugs, repurpose_cts)
 
 
-def dump_drug_cats(CLINDATAPATH,clin_meta):
-    drugs, repurpose_cts = get_repurpose(clin_meta)
+def dump_drug_cats(DATAPATH,CLINDATAPATH,clin_meta):
+    drugs, repurpose_cts = get_repurpose(DATAPATH,DATAPATH,clin_meta)
     drug_repurposing = clin_meta.loc[(clin_meta['interventionCategory']=='dietary supplement')|
                                      (clin_meta['_id'].isin(repurpose_cts))]
     pharma_cts = drugs['_id'].loc[~drugs['_id'].isin(repurpose_cts)].unique().tolist()
@@ -287,7 +295,7 @@ def update_clin_cats(DATAPATH,CLINDATAPATH):
     idlist = get_clin_ids()
     clin_meta = batch_fetch_clin_meta(idlist)
     clin_meta = merge_texts(clin_meta)
-    dump_drug_cats(CLINDATAPATH,clin_meta)
+    dump_drug_cats(DATAPATH,CLINDATAPATH,clin_meta)
     map_interventions(CLINDATAPATH,clin_meta)
     map_designpurpose(CLINDATAPATH,clin_meta)
     map_diagnosis(CLINDATAPATH,clin_meta)
