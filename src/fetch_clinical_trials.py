@@ -141,7 +141,7 @@ def get_wd_drugs(DATAPATH):
         query = querystart+eachwdid+queryend
         params = {'format': 'json', 'query': query, 'headers': headers}
         r = make_request(params)
-        if r != 0:
+        if r != 0 and r != None:
             data = r.json()
             with open(os.path.join(WIKIDATAPATH,eachwdid+'.pickle'),'wb') as dumpfile:
                 pickle.dump(data,dumpfile)
