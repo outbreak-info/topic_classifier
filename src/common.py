@@ -115,19 +115,21 @@ def get_query_ids(query):
     query_size = fetch_query_size(query)
     r = requests.get('https://api.outbreak.info/resources/query?q=(("'+query+'") AND (@type:Publication))&fields=_id&fetch_all=true')
     response = json.loads(r.text)
-    idlist = get_ids_from_json(response)
+    if "error" not in response:
+        idlist = get_ids_from_json(response)
     try:
         scroll_id = response["_scroll_id"]
         while len(idlist) < query_size:
             r2 = requests.get('https://api.outbreak.info/resources/query?q=(("'+query+'") AND (@type:Publication))&fields=_id&fetch_all=true&scroll_id='+scroll_id)
             response2 = json.loads(r2.text)
-            idlist2 = set(get_ids_from_json(response2))
-            tmpset = set(idlist)
-            idlist = tmpset.union(idlist2)
-            try:
-                scroll_id = response2["_scroll_id"]
-            except:
-                print("no new scroll id")
+            if "error" not in response2:
+                idlist2 = set(get_ids_from_json(response2))
+                tmpset = set(idlist)
+                idlist = tmpset.union(idlist2)
+                try:
+                    scroll_id = response2["_scroll_id"]
+                except:
+                    print("no new scroll id")
         return(idlist)
     except:
         return(idlist)

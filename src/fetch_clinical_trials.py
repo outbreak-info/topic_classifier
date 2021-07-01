@@ -190,7 +190,7 @@ def get_repurpose(DATAPATH,clin_meta):
 
 
 def dump_drug_cats(DATAPATH,CLINDATAPATH,clin_meta):
-    drugs, repurpose_cts = get_repurpose(DATAPATH,DATAPATH,clin_meta)
+    drugs, repurpose_cts = get_repurpose(DATAPATH,clin_meta)
     drug_repurposing = clin_meta.loc[(clin_meta['interventionCategory']=='dietary supplement')|
                                      (clin_meta['_id'].isin(repurpose_cts))]
     pharma_cts = drugs['_id'].loc[~drugs['_id'].isin(repurpose_cts)].unique().tolist()
