@@ -1,6 +1,6 @@
 #### Functions for retrieving and formatting LitCovid Topics
 import os
-import requests
+import outbreak_requests
 import pandas as pd
 from pandas import read_csv
 import time
@@ -30,7 +30,7 @@ def get_topics():
               'Epidemic%20Forecasting':'Forecasting'}
     pmid_dict = {}
     for topic in topics.keys():
-        res = requests.get('https://www.ncbi.nlm.nih.gov/research/coronavirus-api/export/tsv?filters=%7B%22topics%22%3A%5B%22'+topic+'%22%5D%7D')
+        res = outbreak_requests.get('https://www.ncbi.nlm.nih.gov/research/coronavirus-api/export/tsv?filters=%7B%22topics%22%3A%5B%22'+topic+'%22%5D%7D')
         data = get_pmids(res)
         pmid_dict[topics[topic]]=data
         time.sleep(1)

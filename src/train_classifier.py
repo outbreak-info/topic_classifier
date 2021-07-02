@@ -1,5 +1,5 @@
 import os
-import requests
+import outbreak_requests
 import pandas as pd
 from pandas import read_csv
 import time
