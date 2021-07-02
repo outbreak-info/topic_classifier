@@ -1,5 +1,5 @@
 import pandas as pd
-import requests
+import outbreak_requests
 import json
 from datetime import datetime
 import time
@@ -60,7 +60,7 @@ def get_ids_from_json(jsonfile):
 
 #### Query by source
 def fetch_src_size(source):
-    pubmeta = requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&size=0&aggs=@type")
+    pubmeta = outbreak_requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&size=0&aggs=@type")
     pubjson = json.loads(pubmeta.text)
     pubcount = int(pubjson["facets"]["@type"]["total"])
     return(pubcount)
@@ -68,14 +68,14 @@ def fetch_src_size(source):
 
 def get_source_ids(source):
     source_size = fetch_src_size(source)
-    r = requests.get('https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"'+source+'"))&fields=_id&fetch_all=true')
+    r = outbreak_requests.get('https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"'+source+'"))&fields=_id&fetch_all=true')
     response = json.loads(r.text)
     if "hits" in response:
         idlist = get_ids_from_json(response)
     try:
         scroll_id = response['_scroll_id']
         while len(idlist) < source_size:
-            r2 = requests.get('https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"'+source+'"))&fields=_id&fetch_all=true&scroll_id='+scroll_id)
+            r2 = outbreak_requests.get('https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"'+source+'"))&fields=_id&fetch_all=true&scroll_id='+scroll_id)
             response2 = json.loads(r2.text)
             if "hits" in response:
                 idlist2 = set(get_ids_from_json(response2))
@@ -108,7 +108,7 @@ def get_pub_ids(sourceset):
 
 #### Query by search terms
 def fetch_query_size(query):
-    pubmeta = requests.get('https://api.outbreak.info/resources/query?q=(("'+query+'") AND (@type:Publication))&size=0&aggs=@type')
+    pubmeta = outbreak_requests.get('https://api.outbreak.info/resources/query?q=(("'+query+'") AND (@type:Publication))&size=0&aggs=@type')
     pubjson = json.loads(pubmeta.text)
     pubcount = int(pubjson["facets"]["@type"]["total"])
     return(pubcount)
@@ -116,14 +116,14 @@ def fetch_query_size(query):
 
 def get_query_ids(query):
     query_size = fetch_query_size(query)
-    r = requests.get('https://api.outbreak.info/resources/query?q=(("'+query+'") AND (@type:Publication))&fields=_id&fetch_all=true')
+    r = outbreak_requests.get('https://api.outbreak.info/resources/query?q=(("'+query+'") AND (@type:Publication))&fields=_id&fetch_all=true')
     response = json.loads(r.text)
     if "hits" in response:
         idlist = get_ids_from_json(response)
     try:
         scroll_id = response["_scroll_id"]
         while len(idlist) < query_size:
-            r2 = requests.get('https://api.outbreak.info/resources/query?q=(("'+query+'") AND (@type:Publication))&fields=_id&fetch_all=true&scroll_id='+scroll_id)
+            r2 = outbreak_requests.get('https://api.outbreak.info/resources/query?q=(("'+query+'") AND (@type:Publication))&fields=_id&fetch_all=true&scroll_id='+scroll_id)
             response2 = json.loads(r2.text)
             if "hits" in response2:
                 idlist2 = set(get_ids_from_json(response2))
@@ -160,7 +160,7 @@ def batch_fetch_meta(idlist):
             sample = idlist[i*100:(i+1)*100]
         sample_ids = separator.join(sample)
         ## Get the text-based metadata (abstract, title) and save it
-        r = requests.post("https://api.outbreak.info/resources/query/", params = {'q': sample_ids, 'scopes': '_id', 'fields': 'name,abstract,description'})
+        r = outbreak_requests.post("https://api.outbreak.info/resources/query/", params = {'q': sample_ids, 'scopes': '_id', 'fields': 'name,abstract,description'})
         if r.status_code == 200:
             rawresult = pd.read_json(r.text)
             checkcols = rawresult.columns
@@ -196,7 +196,7 @@ def batch_fetch_keywords(idlist):
             sample = idlist[i*100:(i+1)*100]
         sample_ids = separator.join(sample)
         ## Get the text-based metadata (abstract, title) and save it
-        r = requests.post("https://api.outbreak.info/resources/query/", params = {'q': sample_ids, 'scopes': '_id', 'fields': 'name,abstract,keywords'})
+        r = outbreak_requests.post("https://api.outbreak.info/resources/query/", params = {'q': sample_ids, 'scopes': '_id', 'fields': 'name,abstract,keywords'})
         if r.status_code == 200:
             rawresult = pd.read_json(r.text)
             checkcols = rawresult.columns
@@ -248,7 +248,7 @@ def get_delay(date):
 
 def make_request(params):
     wikidata_url = 'https://query.wikidata.org/sparql'
-    r = requests.get(wikidata_url, params)
+    r = outbreak_requests.get(wikidata_url, params)
     if r.status_code == 200:
         return r
     if r.status_code == 500:

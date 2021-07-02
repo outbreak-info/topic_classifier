@@ -1,5 +1,5 @@
 import os
-import requests
+import outbreak_requests
 import pandas as pd
 from pandas import read_csv
 import time
@@ -21,7 +21,7 @@ from src.fetch_subtopics import load_clin_cats_data
 
 #### Get the size of the source (to make it easy to figure out when to stop scrolling)
 def fetch_src_size(source):
-    pubmeta = requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&size=0&aggs=@type")
+    pubmeta = outbreak_requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&size=0&aggs=@type")
     pubjson = json.loads(pubmeta.text)
     pubcount = int(pubjson["facets"]["@type"]["total"])
     return(pubcount)
@@ -30,13 +30,13 @@ def fetch_src_size(source):
 #### Ping the API and get all the ids for a specific source and scroll through the source until number of ids matches meta
 def get_source_ids(source):
     source_size = fetch_src_size(source)
-    r = requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&fields=_id&fetch_all=true")
+    r = outbreak_requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&fields=_id&fetch_all=true")
     response = json.loads(r.text)
     idlist = get_ids_from_json(response)
     try:
         scroll_id = response["_scroll_id"]
         while len(idlist) < source_size:
-            r2 = requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&fields=_id&fetch_all=true&scroll_id="+scroll_id)
+            r2 = outbreak_requests.get("https://api.outbreak.info/resources/query?q=((@type:Publication) AND (curatedBy.name:"+source+"))&fields=_id&fetch_all=true&scroll_id="+scroll_id)
             response2 = json.loads(r2.text)
             idlist2 = set(get_ids_from_json(response2))
             tmpset = set(idlist)

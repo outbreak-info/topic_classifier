@@ -1,6 +1,6 @@
 #### Functions for building the non-litcovid topics training set from keywords
 import os
-import requests
+import outbreak_requests
 import pandas as pd
 from pandas import read_csv
 import time
@@ -65,7 +65,7 @@ def search_litcovid_ids(searchterm,topic=False):
         litsearchurl = baseurl+searchterm+nofilter
     else:
         litsearchurl = baseurl+searchterm+filterurl+topic+urlend
-    check_litcovid = requests.get(litsearchurl)
+    check_litcovid = outbreak_requests.get(litsearchurl)
     litcovid_data = check_litcovid.text.split('\n')[34:]
     pmids = []
     for line in litcovid_data:
