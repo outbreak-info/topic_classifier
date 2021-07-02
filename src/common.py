@@ -85,6 +85,7 @@ def get_source_ids(source):
                 scroll_id = response2['_scroll_id']
             except:
                 print("no new scroll id")
+                break
         return(idlist)
     except:
         return(idlist)
@@ -132,6 +133,9 @@ def get_query_ids(query):
                     scroll_id = response2["_scroll_id"]
                 except:
                     print("no new scroll id")
+                    break
+            else:
+                break
         return(idlist)
     except:
         return(idlist)
