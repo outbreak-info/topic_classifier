@@ -1,12 +1,12 @@
 #### Functions for building the non-litcovid topics training set from keywords
 import os
-import outbreak_requests
 import pandas as pd
 from pandas import read_csv
 import time
 from datetime import datetime
 import json
 import pickle
+import requests
 
 #### Pull ids from a json file
 from src.common import *
@@ -65,7 +65,7 @@ def search_litcovid_ids(searchterm,topic=False):
         litsearchurl = baseurl+searchterm+nofilter
     else:
         litsearchurl = baseurl+searchterm+filterurl+topic+urlend
-    check_litcovid = outbreak_requests.get(litsearchurl)
+    check_litcovid = requests.get(litsearchurl)
     litcovid_data = check_litcovid.text.split('\n')[34:]
     pmids = []
     for line in litcovid_data:
@@ -101,6 +101,7 @@ def category_id_check(DATAPATH,topic=False,source='outbreak',topic_type='broadto
             keywordlist = keyword_dict[category]
             for eachkey in keywordlist:
                 idlist = search_litcovid_ids(eachkey)
+                time.sleep(0.5)
                 allids.append({'category':category,'searchterm':eachkey,'ids':idlist})
         idcheck = pd.DataFrame(allids)
     if ((source == 'litcovid') and ('broad' not in topic_type)):
@@ -117,12 +118,14 @@ def category_id_check(DATAPATH,topic=False,source='outbreak',topic_type='broadto
                     keywordlist = keyword_dict[category]
                     for eachkey in keywordlist:
                         idlist = search_litcovid_ids(eachkey,topic)
+                        time.sleep(0.5)
                         totalids = list(set(idlist).union(set(meetsreqs)))
                         allids.append({'category':category,'searchterm':eachkey,'ids':totalids})                    
             elif topic == 'Epidemiology':
                 topic = False
                 for eachkey in keywordlist:
                     idlist = search_litcovid_ids(eachkey,topic)
+                    time.sleep(0.5)
                     allids.append({'category':category,'searchterm':eachkey,'ids':idlist})                    
             elif topic in (mapped_topics.keys()):
                 topic_sublist = mapped_topics[topic]
@@ -130,11 +133,13 @@ def category_id_check(DATAPATH,topic=False,source='outbreak',topic_type='broadto
                     totalids = []
                     for eachtopic in topic_sublist:
                         idlist = search_litcovid_ids(eachkey,eachtopic)
+                        time.sleep(0.5)
                         totalids = list(set(idlist).union(set(totalids)))
                     allids.append({'category':category,'searchterm':eachkey,'ids':totalids})
             else:
                 for eachkey in keywordlist:
                     idlist = search_litcovid_ids(eachkey,topic)
+                    time.sleep(0.5)
                     allids.append({'category':category,'searchterm':eachkey,'ids':idlist})
         idcheck = pd.DataFrame(allids)
     return(idcheck)

@@ -1,5 +1,4 @@
 import os
-import outbreak_requests
 import json
 import pandas as pd
 from pandas import read_csv
@@ -9,7 +8,7 @@ import pickle
 import time
 
 
-
+from src import outbreak_requests
 from src.common import *
 from src.clin_mapping import *
 

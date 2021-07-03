@@ -1,8 +1,9 @@
 import pandas as pd
-import outbreak_requests
 import json
 from datetime import datetime
 import time
+import requests
+from src import outbreak_requests
 
 topic_dict = {'broadtopics':['Behavioral Research','Case Descriptions','Clinical',
                              'Diagnosis','Environment','Epidemiology','Forecasting',
@@ -248,7 +249,7 @@ def get_delay(date):
 
 def make_request(params):
     wikidata_url = 'https://query.wikidata.org/sparql'
-    r = outbreak_requests.get(wikidata_url, params)
+    r = requests.get(wikidata_url, params)
     if r.status_code == 200:
         return r
     if r.status_code == 500:
