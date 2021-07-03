@@ -26,4 +26,4 @@ map_keywords(DATAPATH)
 
 print('fetching all available subtopic data')
 from src.fetch_subtopics import *
-subtopics_only = load_subtopics_data(SUBDATAPATH,RESULTSPATH,topic_dict)
+subtopics_only = load_subtopics_data(DATAPATH,RESULTSPATH,topic_dict)
