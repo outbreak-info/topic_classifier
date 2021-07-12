@@ -1,5 +1,4 @@
 import os
-import outbreak_requests
 import pandas as pd
 from pandas import read_csv
 import time
@@ -10,7 +9,7 @@ import sklearn
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score
-
+from src import outbreak_requests
 
 #### This function classifies ONLY publications which are "new" and have not yet been classified
 #### It uses pre-existing trained models, so if the models have been changed/updated, run the other script
