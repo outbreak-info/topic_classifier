@@ -15,7 +15,7 @@ from src.clin_mapping import *
 
 
 def fetch_clin_size():
-    pubmeta = outbreak_requests.get("https://api.outbreak.info/resources/query?q=@type:ClinicalTrial&size=0&aggs=@type")
+    pubmeta = outbreak_requests.get('https://api.outbreak.info/resources/query?q=(@type:("ClinicalTrial"))&size=0&aggs=@type')
     pubjson = json.loads(pubmeta.text)
     pubcount = int(pubjson["facets"]["@type"]["total"])
     return(pubcount)
@@ -23,13 +23,13 @@ def fetch_clin_size():
 
 def get_clin_ids():
     source_size = fetch_clin_size()
-    r = outbreak_requests.get("https://api.outbreak.info/resources/resource/query?q=@type:ClinicalTrial&fields=_id&fetch_all=true")
+    r = outbreak_requests.get('https://api.outbreak.info/resources/query?q=(@type:("ClinicalTrial"))&field=_id&fetch_all=true')
     response = json.loads(r.text)
     idlist = get_ids_from_json(response)
     try:
         scroll_id = response["_scroll_id"]
         while len(idlist) < source_size:
-            r2 = outbreak_requests.get("https://api.outbreak.info/resources/resource/query?q=@type:ClinicalTrial&fields=_id&fetch_all=true&scroll_id="+scroll_id)
+            r2 = outbreak_requests.get('https://api.outbreak.info/resources/query?q=(@type:("ClinicalTrial"))&field=_id&fetch_all=true&scroll_id='+scroll_id)
             response2 = json.loads(r2.text)
             idlist2 = set(get_ids_from_json(response2))
             tmpset = set(idlist)

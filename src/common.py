@@ -172,9 +172,10 @@ def batch_fetch_meta(idlist):
             elif (('description' not in checkcols) and ('abstract' not in checkcols)):
                 rawresult['abstract']=" "
                 rawresult['description']=" "
-            cleanresult = rawresult[['_id','name','abstract','description']].loc[rawresult['_score']==1].fillna(" ").copy()
-            cleanresult.drop_duplicates(subset='_id',keep="first", inplace=True)
-            textdf = pd.concat((textdf,cleanresult))
+            if (('_id' in checkcols) and ('name' in checkcols)):
+                cleanresult = rawresult[['_id','name','abstract','description']].loc[rawresult['_score']==1].fillna(" ").copy()
+                cleanresult.drop_duplicates(subset='_id',keep="first", inplace=True)
+                textdf = pd.concat((textdf,cleanresult))
         i=i+1
     return(textdf)
 
