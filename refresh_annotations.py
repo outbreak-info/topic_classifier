@@ -35,10 +35,11 @@ subtopics_only = load_subtopics_data(DATAPATH,RESULTSPATH,topic_dict)
 #### Refresh the classification of other resources
 littopicsfile = os.path.join(DATAPATH,'litcovidtopics.tsv')
 offtopicsfile = os.path.join(DATAPATH,'othertopics.tsv')
+subtopicsfile = os.path.join(RESULTSPATH,'subtopicCats.tsv')
 littopicsdf = read_csv(littopicsfile,delimiter='\t',header=0,index_col=0)
 offtopicsdf = read_csv(offtopicsfile,delimiter='\t',header=0,index_col=0)
-subtopic_results = read_csv(os.path.join(RESULTSPATH,'subtopicCats.tsv'),delimiter='\t',header=0,index_col=0)
-topicsdf = pd.concat((littopicsdf,offtopicsdf,subtopic_results),ignore_index=True)
+subtopicsdf = read_csv(subtopicsfile,delimiter='\t',header=0,index_col=0)
+topicsdf = pd.concat((littopicsdf,offtopicsdf,subtopicsdf),ignore_index=True)
 topicsdf.drop_duplicates(keep='first',inplace=True)
 
 classifiers = load_classifiers('best')
